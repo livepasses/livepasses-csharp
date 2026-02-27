@@ -1,0 +1,21 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.nupkg
+*.snupkg
+
+## Visual Studio
+.vs/
+*.rsuser
+[Dd]ebug/
+[Rr]elease/
+
+## Rider
+.idea/
+
+## Test results
+TestResults/

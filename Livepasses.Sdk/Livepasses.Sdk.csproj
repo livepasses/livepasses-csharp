@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>CS1591</NoWarn>
+    <PackageId>Livepasses</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Livepasses</Authors>
+    <Description>Official C# SDK for the Livepasses API</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/livepasses/livepasses-csharp</RepositoryUrl>
+    <PackageTags>livepasses;wallet;apple-wallet;google-wallet;passes;sdk</PackageTags>
+    <RootNamespace>Livepasses.Sdk</RootNamespace>
+  </PropertyGroup>
+
+</Project>
