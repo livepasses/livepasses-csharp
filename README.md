@@ -310,22 +310,15 @@ await client.Passes.UpdateAsync("pass-id", new UpdatePassParams
 });
 ```
 
-### Bulk Update
+### Push a scoped update
 
-Update multiple passes at once:
+Push field updates to all eligible passes of a template:
 
 ```csharp
-await client.Passes.BulkUpdateAsync(new BulkUpdatePassesParams
+await client.Passes.PushTemplateAsync("template-id", new PushTemplatePassesParams
 {
-    PassIds = ["pass-1", "pass-2", "pass-3"],
-    BusinessData = new BusinessData { MemberTier = "Gold" },
-    BusinessContext = new BusinessContext
-    {
-        Loyalty = new LoyaltyContext
-        {
-            SeasonalMessage = "Happy holidays from our team!"
-        }
-    }
+    UpdatedFields = new Dictionary<string, object> { ["gate"] = "Gate C" },
+    Reason = "Event-wide gate change"
 });
 ```
 
@@ -518,7 +511,7 @@ See the [`examples/`](./examples/) directory for runnable projects:
 Run any example with:
 ```bash
 export LIVEPASSES_API_KEY="your-api-key"
-cd sdks/csharp/examples/GeneratePasses
+cd examples/GeneratePasses
 dotnet run
 ```
 

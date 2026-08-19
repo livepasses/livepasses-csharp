@@ -24,8 +24,8 @@ try
         Events = [
             WebhookEventType.PassGenerated,
             WebhookEventType.PassRedeemed,
-            WebhookEventType.PassCheckedIn,
-            WebhookEventType.BatchCompleted
+            WebhookEventType.PassUpdated,
+            WebhookEventType.TransferAccepted
         ]
     });
     Console.WriteLine($"  Webhook ID: {webhook.Id}");
