@@ -135,7 +135,8 @@ public class PassesResource
     }
 
     /// <summary>
-    /// Update a pass.
+    /// Update a pass: change its fields (<see cref="UpdatePassParams.UpdatedFields"/>), send the
+    /// holder a message (<see cref="UpdatePassParams.MessageBody"/>), or both.
     /// </summary>
     public async Task UpdateAsync(string passId, UpdatePassParams parameters)
     {

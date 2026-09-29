@@ -44,42 +44,48 @@ internal static class ExceptionFactory
     };
 
     /// <summary>
-    /// Creates a typed exception from the API error response.
+    /// Creates a typed exception from the API error response. The status decides first for 401
+    /// and 403 (a 403 carrying UNAUTHORIZED is a permission refusal, not a bad key), then the
+    /// code, then the remaining statuses. Every exception carries the real status; a 409 conflict
+    /// has no class of its own and stays a <see cref="LivepassesException"/>.
     /// </summary>
     public static LivepassesException Create(
-        string message, int status, string code, string? details = null, int? retryAfter = null)
+        string message, int status, string code, string? details = null, int? retryAfter = null,
+        IReadOnlyDictionary<string, string[]>? fields = null)
     {
-        // Match by error code first
+        if (status == 401)
+            return new AuthenticationException(message, code, details, status);
+
+        if (status == 403)
+            return new ForbiddenException(message, code, details, status);
+
         if (AuthCodes.Contains(code))
-            return new AuthenticationException(message, code, details);
+            return new AuthenticationException(message, code, details, status);
 
         if (ForbiddenCodes.Contains(code))
-            return new ForbiddenException(message, code, details);
+            return new ForbiddenException(message, code, details, status);
 
         if (ValidationCodes.Contains(code))
-            return new ValidationException(message, code, details);
+            return new ValidationException(message, code, details, fields, status);
 
         if (NotFoundCodes.Contains(code))
-            return new NotFoundException(message, code, details);
+            return new NotFoundException(message, code, details, status);
 
         if (RateLimitCodes.Contains(code))
-            return new RateLimitException(message, code, details, retryAfter);
+            return new RateLimitException(message, code, details, retryAfter, status);
 
         if (QuotaCodes.Contains(code))
-            return new QuotaExceededException(message, code, details);
+            return new QuotaExceededException(message, code, details, status);
 
         if (BusinessRuleCodes.Contains(code))
-            return new BusinessRuleException(message, code, details);
+            return new BusinessRuleException(message, code, details, status);
 
-        // Fall back to HTTP status
         return status switch
         {
-            401 => new AuthenticationException(message, code, details),
-            400 => new ValidationException(message, code, details),
-            403 => new ForbiddenException(message, code, details),
-            404 => new NotFoundException(message, code, details),
-            429 => new RateLimitException(message, code, details, retryAfter),
-            422 => new BusinessRuleException(message, code, details),
+            400 => new ValidationException(message, code, details, fields, status),
+            404 => new NotFoundException(message, code, details, status),
+            422 => new BusinessRuleException(message, code, details, status),
+            429 => new RateLimitException(message, code, details, retryAfter, status),
             _ => new LivepassesException(message, status, code, details)
         };
     }

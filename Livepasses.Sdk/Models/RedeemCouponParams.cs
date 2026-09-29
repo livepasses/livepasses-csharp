@@ -6,5 +6,10 @@ namespace Livepasses.Sdk.Models;
 public class RedeemCouponParams
 {
     public RedemptionLocation? Location { get; set; }
-    public string? Notes { get; set; }
+
+    /// <summary>
+    /// Free-form key/value pairs recorded with the redemption. Use it for anything you want kept
+    /// alongside the redemption, such as an order number or a staff note.
+    /// </summary>
+    public Dictionary<string, string>? Metadata { get; set; }
 }

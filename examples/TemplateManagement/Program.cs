@@ -22,12 +22,24 @@ try
     {
         Name = "VIP Concert Pass",
         Description = "Premium concert ticket with VIP access",
+        // The template type is decided by which block is present: an "event" block makes an event ticket.
         BusinessFeatures = new Dictionary<string, object>
         {
-            ["passType"] = "event",
-            ["hasSeating"] = true,
-            ["hasGateInfo"] = true,
-            ["supportedPlatforms"] = new[] { "apple", "google" }
+            ["event"] = new Dictionary<string, object>
+            {
+                ["eventName"] = "Aurora Music Fest",
+                ["eventDate"] = "2030-06-15T20:00:00Z",
+                ["venueName"] = "Aurora Arena",
+                ["showSeatNumbers"] = true,
+                ["showGateInfo"] = true,
+                ["sectionTypes"] = new[] { "VIP" }
+            },
+            ["branding"] = new Dictionary<string, object>
+            {
+                ["primaryColor"] = "#1A1A1D",
+                ["textColor"] = "#FFFFFF",
+                ["brandName"] = "AURORA FEST"
+            }
         }
     });
     Console.WriteLine($"  Created: {template.Id} — \"{template.Name}\"");
@@ -38,7 +50,15 @@ try
     var updated = await client.Templates.UpdateAsync(template.Id, new UpdateTemplateParams
     {
         Name = "VIP Concert Pass v2",
-        Description = "Updated premium concert ticket with backstage access"
+        Description = "Updated premium concert ticket with backstage access",
+        // PUT merges: send only what changed; omitted event fields keep their values.
+        BusinessFeatures = new Dictionary<string, object>
+        {
+            ["event"] = new Dictionary<string, object>
+            {
+                ["sectionTypes"] = new[] { "VIP", "Backstage" }
+            }
+        }
     });
     Console.WriteLine($"  Updated: \"{updated.Name}\"\n");
 

@@ -31,4 +31,5 @@ internal record ApiError
     public string Message { get; init; } = default!;
     public string Code { get; init; } = default!;
     public string? Details { get; init; }
+    public IReadOnlyDictionary<string, string[]>? Fields { get; init; }
 }

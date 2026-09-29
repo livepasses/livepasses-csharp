@@ -265,11 +265,11 @@ if (validation.CanBeRedeemed)
 // Generic redemption
 var redemption = await client.Passes.RedeemAsync("pass-id");
 
-// Redemption with location and notes
+// Redemption with location and metadata
 var redemption = await client.Passes.RedeemAsync("pass-id", new RedeemPassParams
 {
     Location = new RedemptionLocation { Name = "Store #1", Latitude = 4.6097, Longitude = -74.0817 },
-    Notes = "Walk-in customer"
+    Metadata = new Dictionary<string, string> { ["note"] = "Walk-in customer" }
 });
 ```
 
@@ -288,25 +288,23 @@ await client.Passes.CheckInAsync("pass-id", new CheckInParams
 await client.Passes.RedeemCouponAsync("pass-id", new RedeemCouponParams
 {
     Location = new RedemptionLocation { Name = "Store #42" },
-    Notes = "Applied to order #12345"
+    Metadata = new Dictionary<string, string> { ["orderId"] = "12345" }
 });
 ```
 
 ### Update a Pass
 
-Update business data or context on an existing pass:
+Change fields on an existing pass, send the holder a message, or both. Send a non-empty
+`UpdatedFields`, a non-empty `MessageBody`, or both; the API refuses any other body field with a 400.
 
 ```csharp
 await client.Passes.UpdateAsync("pass-id", new UpdatePassParams
 {
-    BusinessData = new BusinessData { CurrentPoints = 750, MemberTier = "Platinum" },
-    BusinessContext = new BusinessContext
-    {
-        Loyalty = new LoyaltyContext
-        {
-            ProgramUpdate = "Congratulations on reaching Platinum!"
-        }
-    }
+    UpdatedFields = new Dictionary<string, object> { ["points"] = 750, ["memberTier"] = "Platinum" },
+    Reason = "Quarterly tier review",
+    MessageHeader = "New tier",
+    MessageBody = "Congratulations on reaching Platinum!",
+    Notify = true // false updates the pass silently
 });
 ```
 
@@ -345,11 +343,16 @@ var template = await client.Templates.CreateAsync(new CreateTemplateParams
 {
     Name = "VIP Event Pass",
     Description = "Premium event ticket template",
+    // The block you send decides the template type: "event" makes an event ticket.
     BusinessFeatures = new Dictionary<string, object>
     {
-        ["passType"] = "event",
-        ["hasSeating"] = true,
-        ["supportedPlatforms"] = new[] { "apple", "google" }
+        ["event"] = new Dictionary<string, object>
+        {
+            ["eventName"] = "Aurora Music Fest",
+            ["eventDate"] = "2030-06-15T20:00:00Z",
+            ["venueName"] = "Aurora Arena",
+            ["showSeatNumbers"] = true
+        }
     }
 });
 Console.WriteLine($"Created: {template.Id} — {template.Name}");
@@ -391,6 +394,18 @@ await client.Webhooks.DeleteAsync("webhook-id");
 ```
 
 ## Error Handling
+
+The API answers every refusal with a real HTTP status — `400`, `403`, `404`, `409`, `422`, `429`,
+`500`, `502` or `503` — and the body is always the envelope
+`{success:false,data:null,error:{code,message,details,timestamp,traceId,fields?}}`. The two
+exceptions are a challenge `401` (empty body) and a proxy error (which may not be JSON at all).
+
+The SDK raises a typed exception from **any** non-2xx response, or from a parsed envelope with
+`success:false` — this applies to every call, including paged list calls. An empty or non-JSON
+body still raises a typed exception, built from the HTTP status alone. Classification checks
+`error.code` first and falls back to the HTTP status only when the code is unrecognized or
+absent; the message and code themselves fall back (to a generic message, and to
+`GENERAL_ERROR`) only when the field is `null`.
 
 All API errors throw typed exceptions:
 
@@ -462,21 +477,26 @@ catch (LivepassesException ex)
 
 ### Exception hierarchy
 
-| Exception | HTTP Status | When |
+| Exception | Typical status | When |
 |-----------|------------|------|
 | `AuthenticationException` | 401 | Invalid, expired, or revoked API key |
-| `ValidationException` | 400 | Request validation failed |
+| `ValidationException` | 400 | Request validation failed. Carries `Fields` (`IReadOnlyDictionary<string, string[]>?`, field name \| validation messages) when the API's `error.code` is `VALIDATION_ERROR` |
 | `ForbiddenException` | 403 | Insufficient permissions |
 | `NotFoundException` | 404 | Resource not found |
-| `RateLimitException` | 429 | Rate limit exceeded |
-| `QuotaExceededException` | 403 | API quota or subscription limit exceeded |
+| `RateLimitException` | 429 | Rate limit exceeded. `RetryAfter` (seconds) is populated from the `Retry-After` header when present |
+| `QuotaExceededException` | 422 | API quota or subscription limit exceeded |
+
+The status column is the one each class usually carries; the error's `Status` is always the response's real HTTP status. A `401` is always the authentication error and a `403` always the forbidden error, whatever `error.code` says. A `409` without a mapped code, and every `5xx`, raise the base `LivepassesException`.
 | `BusinessRuleException` | 422 | Business rule violation (pass expired, already used, etc.) |
 
 ### Automatic retries
 
 The SDK automatically retries on:
 - **429 Too Many Requests** — honors `Retry-After` header
-- **5xx Server Errors** — exponential backoff with jitter
+- **5xx Server Errors** — exponential backoff with jitter, and **only for idempotent HTTP
+  methods** (`GET`, `HEAD`, `PUT`, `DELETE`). A `POST` that hits a `5xx` is never retried,
+  because no SDK request carries an `Idempotency-Key` and retrying it could double-execute the
+  operation (for example, generating passes twice).
 
 ## CancellationToken Support
 

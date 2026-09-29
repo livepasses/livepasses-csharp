@@ -17,6 +17,11 @@ internal class LivepassesHttpClient
     private readonly int _maxRetries;
     private static readonly Random Rng = new();
 
+    // Only these methods are safe to replay against a 5xx: no SDK request carries an
+    // Idempotency-Key, so the retry gate is the HTTP method alone (controller ruling R2).
+    private static readonly HashSet<HttpMethod> IdempotentMethods =
+        [HttpMethod.Get, HttpMethod.Head, HttpMethod.Put, HttpMethod.Delete];
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -67,19 +72,13 @@ internal class LivepassesHttpClient
         var url = BuildUrl(path, queryParams);
         var response = await FetchWithRetryAsync(HttpMethod.Get, url).ConfigureAwait(false);
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-        var envelope = JsonSerializer.Deserialize<ApiPagedResponse<T>>(json, JsonOptions);
+        var envelope = ReadEnvelope<ApiPagedResponse<T>>(json);
+
+        if (!response.IsSuccessStatusCode || envelope is { Success: false })
+            throw ToError(response, envelope?.Error);
 
         if (envelope is null)
-            throw new LivepassesException("Failed to deserialize API response", 0, "DESERIALIZATION_ERROR");
-
-        if (!envelope.Success && envelope.Error is not null)
-        {
-            throw ExceptionFactory.Create(
-                envelope.Error.Message,
-                (int)response.StatusCode,
-                envelope.Error.Code,
-                envelope.Error.Details);
-        }
+            throw new LivepassesException("Failed to deserialize API response", (int)response.StatusCode, "DESERIALIZATION_ERROR");
 
         return new PagedResponse<T>
         {
@@ -92,19 +91,13 @@ internal class LivepassesHttpClient
     {
         var response = await FetchWithRetryAsync(method, path, body).ConfigureAwait(false);
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-        var envelope = JsonSerializer.Deserialize<ApiResponse<T>>(json, JsonOptions);
+        var envelope = ReadEnvelope<ApiResponse<T>>(json);
+
+        if (!response.IsSuccessStatusCode || envelope is { Success: false })
+            throw ToError(response, envelope?.Error);
 
         if (envelope is null)
-            throw new LivepassesException("Failed to deserialize API response", 0, "DESERIALIZATION_ERROR");
-
-        if (!envelope.Success && envelope.Error is not null)
-        {
-            throw ExceptionFactory.Create(
-                envelope.Error.Message,
-                (int)response.StatusCode,
-                envelope.Error.Code,
-                envelope.Error.Details);
-        }
+            throw new LivepassesException("Failed to deserialize API response", (int)response.StatusCode, "DESERIALIZATION_ERROR");
 
         return envelope.Data!;
     }
@@ -113,21 +106,27 @@ internal class LivepassesHttpClient
     {
         var response = await FetchWithRetryAsync(method, path, body).ConfigureAwait(false);
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        var envelope = ReadEnvelope<ApiResponse<object>>(json);
 
-        if (string.IsNullOrWhiteSpace(json))
-            return;
-
-        var envelope = JsonSerializer.Deserialize<ApiResponse<object>>(json, JsonOptions);
-
-        if (envelope is not null && !envelope.Success && envelope.Error is not null)
-        {
-            throw ExceptionFactory.Create(
-                envelope.Error.Message,
-                (int)response.StatusCode,
-                envelope.Error.Code,
-                envelope.Error.Details);
-        }
+        if (!response.IsSuccessStatusCode || envelope is { Success: false })
+            throw ToError(response, envelope?.Error);
     }
+
+    private static TEnvelope? ReadEnvelope<TEnvelope>(string json) where TEnvelope : class
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return JsonSerializer.Deserialize<TEnvelope>(json, JsonOptions); }
+        catch (JsonException) { return null; } // empty (challenge 401) or non-JSON body (proxy error page)
+    }
+
+    private static LivepassesException ToError(HttpResponseMessage response, ApiError? error) =>
+        ExceptionFactory.Create(
+            error?.Message ?? $"API request failed with status {(int)response.StatusCode}",
+            (int)response.StatusCode,
+            error?.Code ?? "GENERAL_ERROR",
+            error?.Details,
+            ParseRetryAfter(response.Headers),
+            error?.Fields);
 
     private async Task<HttpResponseMessage> FetchWithRetryAsync(HttpMethod method, string path, object? body = null)
     {
@@ -181,8 +180,8 @@ internal class LivepassesHttpClient
                 continue;
             }
 
-            // Handle 5xx Server Error — cap at 2 retries (3 total attempts)
-            if ((int)response.StatusCode >= 500)
+            // Handle 5xx Server Error — only for idempotent methods, cap at 2 retries (3 total attempts)
+            if ((int)response.StatusCode >= 500 && IdempotentMethods.Contains(method))
             {
                 var maxServerRetries = Math.Min(maxAttempts, 3);
                 if (attempt < maxServerRetries)

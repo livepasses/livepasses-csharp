@@ -57,6 +57,54 @@ public class PassesResourceTests : IDisposable
     }
 
     [Fact]
+    public async Task ShouldExposeTheErrorCodeOfAFailedRecipient()
+    {
+        const string body = """
+        {
+          "success": true,
+          "data": {
+            "batchId": "batch-002",
+            "templateId": "template-001",
+            "totalPasses": 1,
+            "isAsyncProcessing": false,
+            "passes": [
+              {
+                "id": "failed_abc",
+                "status": "failed",
+                "errorCode": "MEMBERSHIP_NUMBER_CONFLICT",
+                "errorMessage": "Membership number 'MEM-001' already belongs to another member of this program.",
+                "platforms": { "apple": { "available": false }, "google": { "available": false } },
+                "businessData": {}
+              }
+            ]
+          }
+        }
+        """;
+        _server.Given(
+            Request.Create().WithPath("/api/passes/generate").UsingPost()
+        ).RespondWith(
+            Response.Create().WithStatusCode(200).WithBody(body)
+        );
+
+        var result = await _client.Passes.GenerateAsync(new Models.GeneratePassesParams
+        {
+            TemplateId = "template-001",
+            Passes =
+            [
+                new Models.PassRecipient
+                {
+                    Customer = new Models.CustomerInfo { FirstName = "Grace", LastName = "Hopper", Email = "grace@example.com" },
+                    BusinessData = new Models.BusinessData { MembershipNumber = "MEM-001" }
+                }
+            ]
+        });
+
+        result.Passes[0].Status.Should().Be("failed");
+        result.Passes[0].ErrorCode.Should().Be("MEMBERSHIP_NUMBER_CONFLICT");
+        result.Passes[0].ErrorMessage.Should().Contain("MEM-001");
+    }
+
+    [Fact]
     public async Task ShouldGenerateAndWaitSync()
     {
         _server.Given(
@@ -205,7 +253,7 @@ public class PassesResourceTests : IDisposable
         var result = await _client.Passes.CheckInAsync("pass-001", new Models.CheckInParams
         {
             Location = new Models.RedemptionLocation { Name = "Gate A", Latitude = 4.6097, Longitude = -74.0817 },
-            Notes = "VIP entrance"
+            Metadata = new Dictionary<string, string> { ["entrance"] = "VIP" }
         });
 
         result.PassId.Should().Be("pass-001");

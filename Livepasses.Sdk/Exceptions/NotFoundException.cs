@@ -6,8 +6,14 @@ namespace Livepasses.Sdk.Exceptions;
 public class NotFoundException : LivepassesException
 {
     /// <summary>
-    /// Creates a new <see cref="NotFoundException"/>.
+    /// Creates a new <see cref="NotFoundException"/> with the historical status, 404.
     /// </summary>
     public NotFoundException(string message, string code, string? details = null)
-        : base(message, 404, code, details) { }
+        : this(message, code, details, 404) { }
+
+    /// <summary>
+    /// Creates a new <see cref="NotFoundException"/> carrying the response's real HTTP status.
+    /// </summary>
+    public NotFoundException(string message, string code, string? details, int status)
+        : base(message, status, code, details) { }
 }

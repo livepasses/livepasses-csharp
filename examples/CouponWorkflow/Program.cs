@@ -76,7 +76,7 @@ try
             var redemption = await client.Passes.RedeemCouponAsync(passId, new RedeemCouponParams
             {
                 Location = new RedemptionLocation { Name = "Store #42", Latitude = 4.6097, Longitude = -74.0817 },
-                Notes = "Applied to order #12345"
+                Metadata = new Dictionary<string, string> { ["orderId"] = "12345" }
             });
             Console.WriteLine($"  Previous: {redemption.PreviousStatus}");
             Console.WriteLine($"  New: {redemption.NewStatus}");

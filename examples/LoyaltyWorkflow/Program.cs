@@ -74,15 +74,10 @@ try
     Console.WriteLine("Upgrading to Gold tier...");
     await client.Passes.UpdateAsync(passId, new UpdatePassParams
     {
-        BusinessData = new BusinessData { CurrentPoints = 600, MemberTier = "Gold" },
-        BusinessContext = new BusinessContext
-        {
-            Loyalty = new LoyaltyContext
-            {
-                ProgramUpdate = "Congratulations! You've been upgraded to Gold tier!",
-                SeasonalMessage = "Enjoy double points this month!"
-            }
-        }
+        UpdatedFields = new Dictionary<string, object> { ["memberTier"] = "Gold" },
+        Reason = "Reached the Gold threshold",
+        MessageHeader = "Welcome to Gold",
+        MessageBody = "Congratulations! You've been upgraded to Gold tier!"
     });
     Console.WriteLine("  Tier updated to Gold\n");
 

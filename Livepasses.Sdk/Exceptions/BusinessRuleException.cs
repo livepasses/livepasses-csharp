@@ -6,8 +6,14 @@ namespace Livepasses.Sdk.Exceptions;
 public class BusinessRuleException : LivepassesException
 {
     /// <summary>
-    /// Creates a new <see cref="BusinessRuleException"/>.
+    /// Creates a new <see cref="BusinessRuleException"/> with the historical status, 422.
     /// </summary>
     public BusinessRuleException(string message, string code, string? details = null)
-        : base(message, 422, code, details) { }
+        : this(message, code, details, 422) { }
+
+    /// <summary>
+    /// Creates a new <see cref="BusinessRuleException"/> carrying the response's real HTTP status.
+    /// </summary>
+    public BusinessRuleException(string message, string code, string? details, int status)
+        : base(message, status, code, details) { }
 }
